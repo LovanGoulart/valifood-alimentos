@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - ValiFood{% endblock %}
+
+{% block content %}
+<div class="detail-page">
+    <div class="detail-header">
+        <div class="detail-icon">{{ product.category.icon if product.category else '📦' }}</div>
+        <div class="detail-title">
+            <h2>{{ product.name }}</h2>
+            <p class="detail-brand">{{ product.brand or 'Sem marca' }}</p>
+        </div>
+    </div>
+
+    <div class="detail-status status-{{ product.get_status() }}">
+        {% if product.no_expiration or not product.expiration_date %}
+            <span class="status-icon">📅</span>
+            <span class="status-text">Sem validade informada</span>
+        {% elif product.get_status() == 'vencido' %}
+            <span class="status-icon">❌</span>
+            <span class="status-text">Vencido há {{ product.get_days_remaining()|abs }} dias</span>
+        {% elif product.get_status() == 'vence_hoje' %}
+            <span class="status-icon">⚠️</span>
+            <span class="status-text">Vence hoje!</span>
+        {% elif product.get_status() == 'urgente' %}
+            <span class="status-icon">🔴</span>
+            <span class="status-text">Vence em {{ product.get_days_remaining() }} dias</span>
+        {% elif product.get_status() == 'atencao' %}
+            <span class="status-icon">🟡</span>
+            <span class="status-text">Vence em {{ product.get_days_remaining() }} dias</span>
+        {% elif product.get_status() == 'proximo' %}
+            <span class="status-icon">🔵</span>
+            <span class="status-text">Vence em {{ product.get_days_remaining() }} dias</span>
+        {% else %}
+            <span class="status-icon">✓</span>
+            <span class="status-text">Vence em {{ product.get_days_remaining() }} dias</span>
+        {% endif %}
+    </div>
+
+    <div class="detail-info">
+        <div class="info-row">
+            <span class="info-label">Código de barras</span>
+            <span class="info-value">{{ product.barcode or '—' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Categoria</span>
+            <span class="info-value">{{ product.category.icon if product.category else '📦' }} {{ product.category.name if product.category else '—' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Quantidade</span>
+            <span class="info-value">{{ product.quantity|int }} {{ product.unit }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Local</span>
+            <span class="info-value">{{ product.location.icon if product.location else '📍' }} {{ product.location.name if product.location else '—' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Validade</span>
+            <span class="info-value">{{ product.expiration_date.strftime('%d/%m/%Y') if product.expiration_date else '—' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Cadastrado em</span>
+            <span class="info-value">{{ product.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+        </div>
+        {% if product.notes %}
+        <div class="info-row">
+            <span class="info-label">Observações</span>
+            <span class="info-value">{{ product.notes }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="detail-actions">
+        <div class="qty-control">
+            <form method="POST" action="{{ url_for('products.consume', id=product.id) }}" class="inline-form">
+                <input type="hidden" name="amount" value="1">
+                <button type="submit" class="btn btn-secondary btn-icon" aria-label="Consumir 1">
+                    <span>➖</span>
+                </button>
+            </form>
+            <span class="qty-display">{{ product.quantity|int }} {{ product.unit }}</span>
+            <form method="POST" action="{{ url_for('products.add_stock', id=product.id) }}" class="inline-form">
+                <input type="hidden" name="amount" value="1">
+                <button type="submit" class="btn btn-secondary btn-icon" aria-label="Adicionar 1">
+                    <span>➕</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="action-buttons">
+            <a href="{{ url_for('products.edit', id=product.id) }}" class="btn btn-secondary">✏️ Editar</a>
+            <form method="POST" action="{{ url_for('products.delete', id=product.id) }}" 
+                  class="inline-form" onsubmit="return confirm('Tem certeza que deseja excluir este produto?');">
+                <button type="submit" class="btn btn-danger">🗑️ Excluir</button>
+            </form>
+        </div>
+    </div>
+
+    {% if history %}
+    <div class="detail-history">
+        <h3>📜 Histórico</h3>
+        {% for h in history %}
+        <div class="history-item">
+            <span class="history-action">
+                {% if h.action == 'cadastrado' %}➕ Cadastrado
+                {% elif h.action == 'consumido' %}➖ Consumido {{ h.quantity_change|abs|int }} {{ h.notes.split()[-1] if h.notes else '' }}
+                {% elif h.action == 'estoque_adicionado' %}➕ Estoque +{{ h.quantity_change|int }}
+                {% elif h.action == 'excluido' %}🗑️ Excluído
+                {% else %}✏️ Editado{% endif %}
+            </span>
+            <span class="history-date">{{ h.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

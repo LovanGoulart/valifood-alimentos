@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Alertas - ValiFood{% endblock %}
+
+{% block content %}
+<div class="notifications-page">
+    <div class="page-header">
+        <h2>⚠️ Alertas de Validade</h2>
+    </div>
+
+    {% if alerts %}
+    <div class="alert-list">
+        {% for alert in alerts %}
+        <a href="{{ url_for('products.detail', id=alert.product.id) }}" class="alert-card alert-{{ alert.level }}">
+            <div class="alert-icon">
+                {% if alert.level == 'vencido' %}❌{% elif alert.level == 'vence_hoje' %}⚠️{% elif alert.level == 'urgente' %}🔴{% else %}🟡{% endif %}
+            </div>
+            <div class="alert-info">
+                <h4>{{ alert.product.name }}</h4>
+                <p>
+                    {% if alert.days < 0 %}
+                        Vencido há {{ alert.days|abs }} dias
+                    {% elif alert.days == 0 %}
+                        Vence hoje!
+                    {% else %}
+                        Vence em {{ alert.days }} dias
+                    {% endif %}
+                </p>
+                <span class="alert-date">{{ alert.product.expiration_date.strftime('%d/%m/%Y') }}</span>
+            </div>
+            <div class="alert-qty">{{ alert.product.quantity|int }} {{ alert.product.unit }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon">✅</span>
+        <p>Nenhum alerta no momento</p>
+        <p class="empty-sub">Todos os seus produtos estão em dia!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

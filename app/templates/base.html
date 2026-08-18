@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="ValiFood - Controle inteligente de alimentos e validade">
+
+    <title>{% block title %}ValiFood{% endblock %}</title>
+
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        /* ===== Botão Voltar ao Topo ===== */
+        .btn-scroll-top {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #10b981;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            font-size: 20px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            padding: 0;
+            margin: 0;
+        }
+        .btn-scroll-top.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        /* ===== Modal do Scanner ===== */
+        .scanner-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+        }
+        .scanner-content {
+            position: relative;
+            background: #1f2937;
+            border-radius: 16px;
+            width: 92%;
+            max-width: 420px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .scanner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: #111827;
+            color: #ffffff;
+        }
+        .scanner-header h3 { 
+            margin: 0; 
+            font-size: 1.1rem; 
+            color: #ffffff;
+        }
+        .scanner-subtitle {
+            margin: 4px 0 0 0;
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+        .scanner-close {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.3rem;
+            cursor: pointer;
+        }
+        .scanner-reader {
+            padding: 12px;
+            min-height: 240px;
+        }
+        .scanner-reader video {
+            border-radius: 12px;
+            width: 100% !important;
+        }
+        .scanner-loading, .scanner-result {
+            padding: 24px;
+            text-align: center;
+        }
+        .spinner {
+            display: inline-block;
+            width: 32px; height: 32px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .result-code {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            word-break: break-all;
+            color: #ffffff;
+        }
+        .result-info {
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            color: #e5e7eb;
+        }
+        .result-info p { margin: 4px 0; }
+
+        /* ===== BOTÕES DO MODAL - FORÇAR VISIBILIDADE ===== */
+        .scanner-content .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .scanner-content .btn,
+        .scanner-content a.btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            color: #ffffff !important;
+            transition: opacity 0.2s;
+        }
+        .scanner-content .btn-primary {
+            background: #10b981;
+        }
+        .scanner-content .btn-secondary {
+            background: #4b5563;
+        }
+        .scanner-content .btn-danger {
+            background: #ef4444;
+        }
+        .scanner-content .btn-ghost {
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.25) !important;
+            color: #ffffff !important;
+        }
+        .scanner-content a.btn-ghost {
+            color: #ffffff !important;
+        }
+        .error-msg { 
+            color: #ef4444; 
+            margin-bottom: 12px; 
+            font-weight: 500;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="toast-container" id="toast-container">
+                {% for category, message in messages %}
+                    <div class="toast toast-{{ category }}" role="alert" aria-live="polite">
+                        <span class="toast-icon">
+                            {% if category == 'success' %}✓{% elif category == 'danger' %}✕{% elif category == 'warning' %}⚠{% else %}ℹ{% endif %}
+                        </span>
+                        <span class="toast-message">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="app-container">
+        {% if current_user.is_authenticated %}
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">ValiFood</h1>
+                <span class="app-subtitle">Controle de validade</span>
+            </div>
+        </header>
+        {% endif %}
+
+        <main class="app-main">
+            {% block content %}{% endblock %}
+        </main>
+
+        {% if current_user.is_authenticated %}
+        <nav class="bottom-nav" aria-label="Navegação principal">
+            <a href="{{ url_for('dashboard.index') }}" class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}" aria-label="Início">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Início</span>
+            </a>
+            <a href="{{ url_for('notifications.settings') }}" class="nav-item {% if request.endpoint and 'settings' in request.endpoint %}active{% endif %}" aria-label="Configurações">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Config</span>
+            </a>
+            <a href="#" onclick="openScannerModal(); return false;" class="nav-item nav-scan" aria-label="Escanear">
+                <span class="nav-icon">📷</span>
+                <span class="nav-label">Scan</span>
+            </a>
+            <a href="{{ url_for('notifications.index') }}" class="nav-item {% if request.endpoint and 'notifications' in request.endpoint %}active{% endif %}" aria-label="Alertas">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-label">Alertas</span>
+            </a>
+            <a href="{{ url_for('products.list_products') }}" class="nav-item {% if request.endpoint and 'products' in request.endpoint %}active{% endif %}" aria-label="Produtos">
+                <span class="nav-icon">📦</span>
+                <span class="nav-label">Produtos</span>
+            </a>
+        </nav>
+
+        <!-- Botão Voltar ao Topo -->
+        <button type="button" class="btn-scroll-top" id="btn-scroll-top" aria-label="Voltar ao topo">
+            ▲
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Modal do Scanner -->
+    <div id="scanner-modal" class="scanner-modal" style="display:none;">
+        <div class="scanner-overlay" onclick="closeScannerModal()"></div>
+        <div class="scanner-content">
+            <div class="scanner-header">
+                <div>
+                    <h3 id="scanner-title">📷 Scanear código de barras</h3>
+                    <p class="scanner-subtitle">Posicione o código dentro da área abaixo</p>
+                </div>
+                <button type="button" class="scanner-close" onclick="closeScannerModal()">✕</button>
+            </div>
+            <div id="scanner-reader" class="scanner-reader"></div>
+            <div id="scanner-loading" class="scanner-loading" style="display:none;">
+                <span class="spinner"></span>
+                <p>Processando...</p>
+            </div>
+            <div id="scanner-result" class="scanner-result" style="display:none;">
+                <p class="result-code">Código: <span id="scanned-code"></span></p>
+                <div id="scanner-actions" class="scanner-actions"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="{{ url_for('static', filename='js/scanner-modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/push.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => console.log('SW registrado'))
+                .catch(err => console.log('SW erro:', err));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnTop = document.getElementById('btn-scroll-top');
+            if (!btnTop) return;
+
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 150) {
+                    btnTop.classList.add('show');
+                } else {
+                    btnTop.classList.remove('show');
+                }
+            });
+
+            btnTop.addEventListener('click', function() {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>

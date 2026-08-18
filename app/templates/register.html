@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro - ValiFood{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <span class="logo-icon">🥗</span>
+            <h1>ValiFood</h1>
+            <p>Crie sua conta gratuita</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.register') }}" class="auth-form">
+            <div class="form-group">
+                <label for="name">Nome</label>
+                <input type="text" id="name" name="name" required 
+                       placeholder="Seu nome" autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label for="email">E-mail</label>
+                <input type="email" id="email" name="email" required 
+                       placeholder="seu@email.com" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm">Confirmar senha</label>
+                <input type="password" id="confirm" name="confirm" required 
+                       placeholder="Repita a senha" autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Já tem conta? <a href="{{ url_for('auth.login') }}">Faça login</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

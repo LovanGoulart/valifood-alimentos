@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Início - ValiFood{% endblock %}
+
+{% block content %}
+<style>
+    .section-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        padding: 4px 0;
+    }
+    .section-toggle .toggle-arrow {
+        font-size: 0.9rem;
+        transition: transform 0.25s ease;
+        opacity: 0.7;
+    }
+    .section-toggle.open .toggle-arrow {
+        transform: rotate(180deg);
+    }
+    .history-list {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.35s ease;
+    }
+    .history-list.open {
+        max-height: 800px; /* espaço suficiente para 10 itens */
+    }
+</style>
+
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h2>Olá, {{ current_user.name.split()[0] }}! 👋</h2>
+        <p class="dashboard-date">📅 {{ now.strftime('%d/%m/%Y') }}</p>
+    </div>
+
+    <!--<div class="stats-grid">
+        <a href="{{ url_for('products.list_products') }}" class="stat-card stat-total">
+            <span class="stat-number">{{ total }}</span>
+            <span class="stat-label">Total de produtos</span>
+        </a>
+        <a href="{{ url_for('products.list_products', status='vencido') }}" class="stat-card stat-danger">
+            <span class="stat-number">{{ vencidos }}</span>
+            <span class="stat-label">Vencidos</span>
+        </a>
+        <a href="{{ url_for('products.list_products', status='vence_hoje') }}" class="stat-card stat-warning">
+            <span class="stat-number">{{ vence_hoje }}</span>
+            <span class="stat-label">Vence hoje</span>
+        </a>
+        <a href="{{ url_for('products.list_products', status='atencao') }}" class="stat-card stat-attention">
+            <span class="stat-number">{{ vence_7 }}</span>
+            <span class="stat-label">Próx. 7 dias</span>
+        </a>
+        <a href="{{ url_for('products.list_products', status='proximo') }}" class="stat-card stat-info">
+            <span class="stat-number">{{ vence_30 }}</span>
+            <span class="stat-label">Próx. 30 dias</span>
+        </a>
+    </div>-->
+    
+    <section class="section">
+        <h3 class="section-title">📂 Categorias</h3>
+        <div class="category-scroll">
+            {% for cat in categories %}
+            <a href="{{ url_for('products.list_products', category=cat.id) }}" class="category-chip">
+                <span class="category-icon">{{ cat.icon }}</span>
+                <span class="category-name">{{ cat.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if consuma_primeiro %}
+    <section class="section">
+        <h3 class="section-title">🍽️ Consuma primeiro</h3>
+        <div class="product-list">
+            {% for p in consuma_primeiro %}
+            <a href="{{ url_for('products.detail', id=p.id) }}" class="product-card product-{{ p.get_status() }}">
+                <div class="product-icon">{{ p.category.icon if p.category else '📦' }}</div>
+                <div class="product-info">
+                    <h4 class="product-name">{{ p.name }}</h4>
+                    <p class="product-meta">
+                        {% if p.get_status() == 'vence_hoje' %}
+                            <span class="badge badge-warning">⚠️ Vence hoje</span>
+                        {% elif p.get_status() == 'urgente' %}
+                            <span class="badge badge-urgent">🔴 Vence em {{ p.get_days_remaining() }} dias</span>
+                        {% elif p.get_status() == 'atencao' %}
+                            <span class="badge badge-attention">🟡 Vence em {{ p.get_days_remaining() }} dias</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="product-qty">{{ p.quantity|int }} {{ p.unit }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if recent_history %}
+    <section class="section">
+        <div class="section-toggle" id="history-toggle" onclick="toggleHistory()">
+            <h3 class="section-title" style="margin:0;">📜 Histórico recente</h3>
+            <span class="toggle-arrow">▼</span>
+        </div>
+        <div class="history-list" id="history-list">
+            {% for h in recent_history %}
+            <div class="history-item">
+                <div class="history-icon">
+                    {% if h.action == 'cadastrado' %}➕{% elif h.action == 'consumido' %}➖{% elif h.action == 'excluido' %}🗑️{% else %}✏️{% endif %}
+                </div>
+                <div class="history-info">
+                    <p class="history-text">
+                        <strong>{{ h.product_name }}</strong>
+                        {% if h.action == 'cadastrado' %}
+                            cadastrado
+                        {% elif h.action == 'consumido' %}
+                            - {{ h.quantity_change|abs|int }} {{ h.notes.split()[-1] if h.notes else 'unidade' }}
+                        {% elif h.action == 'estoque_adicionado' %}
+                            + {{ h.quantity_change|int }} {{ h.notes.split()[-1] if h.notes else 'unidade' }}
+                        {% elif h.action == 'excluido' %}
+                            removido
+                        {% else %}
+                            editado
+                        {% endif %}
+                    </p>
+                    <span class="history-date">{{ h.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+function toggleHistory() {
+    const toggle = document.getElementById('history-toggle');
+    const list = document.getElementById('history-list');
+    if (!toggle || !list) return;
+    
+    toggle.classList.toggle('open');
+    list.classList.toggle('open');
+}
+</script>
+{% endblock %}

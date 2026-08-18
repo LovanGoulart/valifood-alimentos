@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - ValiFood{% endblock %}
+
+{% block content %}
+<div class="settings-page">
+    <div class="page-header">
+        <h2>⚙️ Configurações</h2>
+    </div>
+
+    <div class="settings-section">
+        <h3>👤 Perfil</h3>
+        <div class="settings-item">
+            <span class="settings-label">Nome</span>
+            <span class="settings-value">{{ current_user.name }}</span>
+        </div>
+        <div class="settings-item">
+            <span class="settings-label">E-mail</span>
+            <span class="settings-value">{{ current_user.email }}</span>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h3>🔔 Alertas de Vencimento</h3>
+        <form method="POST" action="{{ url_for('notifications.settings') }}" class="settings-form">
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_day_of" {% if current_user.alert_day_of %}checked{% endif %}>
+                <span> No dia do vencimento</span>
+            </label>
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_1_day" {% if current_user.alert_1_day %}checked{% endif %}>
+                <span> 1 dia antes</span>
+            </label>
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_3_days" {% if current_user.alert_3_days %}checked{% endif %}>
+                <span> 3 dias antes</span>
+            </label>
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_7_days" {% if current_user.alert_7_days %}checked{% endif %}>
+                <span> 7 dias antes</span>
+            </label>
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_14_days" {% if current_user.alert_14_days %}checked{% endif %}>
+                <span> 14 dias antes</span>
+            </label>
+            <label class="settings-checkbox">
+                <input type="checkbox" name="alert_30_days" {% if current_user.alert_30_days %}checked{% endif %}>
+                <span> 30 dias antes</span>
+            </label>
+            <button type="submit" class="btn btn-primary">💾 Salvar preferências</button>
+        </form>
+    </div>
+
+    <div class="settings-section">
+        <h3>📦 Gerenciamento</h3>
+        <a href="{{ url_for('categories.list_categories') }}" class="settings-link">
+            <span>📂 Categorias</span>
+            <span>›</span>
+        </a>
+    </div>
+
+    <div class="settings-section">
+        <h3>📱 Aplicativo</h3>
+        <button type="button" class="settings-link" id="install-btn" style="display:none;">
+            <span>📲 Instalar na tela inicial</span>
+            <span>›</span>
+        </button>
+        <button type="button" class="settings-link" id="push-btn" onclick="handlePushToggle()">
+            <span>🔔 Ativar notificações</span>
+            <span>›</span>
+        </button>
+        <button type="button" class="settings-link" id="push-test-btn" style="display:none;" onclick="sendTestPush()">
+            <span>📨 Enviar notificação de teste</span>
+            <span>›</span>
+        </button>
+    </div>
+
+    <div class="settings-section">
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-block">🚪 Sair da conta</a>
+    </div>
+</div>
+
+<script>
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-btn').style.display = 'flex';
+});
+
+document.getElementById('install-btn').addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            deferredPrompt = null;
+            document.getElementById('install-btn').style.display = 'none';
+        }
+    }
+});
+
+async function handlePushToggle() {
+    const ok = await subscribeToPush();
+    if (ok) {
+        alert('✓ Notificações ativadas! Você receberá alertas mesmo com o app fechado.');
+        updatePushUI();
+    }
+}
+
+async function updatePushUI() {
+    const btn = document.getElementById('push-btn');
+    const testBtn = document.getElementById('push-test-btn');
+    try {
+        const reg = await getSwRegistration();
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            btn.querySelector('span').textContent = '🔔 Notificações ativadas ✓';
+            testBtn.style.display = 'flex';
+        } else {
+            btn.querySelector('span').textContent = '🔔 Ativar notificações';
+            testBtn.style.display = 'none';
+        }
+    } catch (e) {
+        // sem suporte — esconde
+    }
+}
+
+updatePushUI();
+</script>
+{% endblock %}

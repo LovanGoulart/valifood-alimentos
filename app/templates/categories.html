@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Categorias - ValiFood{% endblock %}
+
+{% block content %}
+<style>
+    .emoji-display {
+        width: 44px;
+        height: 44px;
+        text-align: center;
+        font-size: 1.4rem;
+        line-height: 44px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+    }
+    /* Modal de emojis centralizado */
+    .emoji-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.75);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .emoji-modal-overlay.open {
+        display: flex;
+    }
+    .emoji-modal {
+        background: #1f2937;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 16px;
+        padding: 16px;
+        width: 100%;
+        max-width: 340px;
+        max-height: 70vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .emoji-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .emoji-modal-header h4 {
+        margin: 0;
+        font-size: 1rem;
+        color: #fff;
+    }
+    .emoji-modal-close {
+        background: none;
+        border: none;
+        color: #9ca3af;
+        font-size: 1.3rem;
+        cursor: pointer;
+    }
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+    }
+    .emoji-option {
+        background: rgba(255,255,255,0.04);
+        border: none;
+        border-radius: 8px;
+        font-size: 1.6rem;
+        padding: 8px 2px;
+        cursor: pointer;
+        text-align: center;
+        transition: background 0.15s;
+    }
+    .emoji-option:hover, .emoji-option:active {
+        background: rgba(255,255,255,0.18);
+    }
+</style>
+
+<div class="categories-page">
+    <div class="page-header">
+        <h2>📂 Categorias</h2>
+    </div>
+
+    <!-- Nova categoria -->
+    <form method="POST" action="{{ url_for('categories.new_category') }}" class="category-form">
+        <div class="form-row">
+            <div class="form-group" style="flex:1;">
+                <input type="text" name="name" placeholder="Crie nova categoria" required>
+            </div>
+            <div class="form-group">
+                <input type="hidden" name="icon" id="icon-new" value="📦">
+                <div class="emoji-display" onclick="openEmojiPicker('new')">📦</div>
+            </div>
+            <input type="hidden" name="color" value="#6366f1">
+            <button type="submit" class="btn btn-primary">➕</button>
+        </div>
+    </form>
+
+    <!-- Lista -->
+    <div class="category-list">
+        {% for cat in categories %}
+        <div class="category-item">
+            <div class="category-info">
+                <span class="category-icon-large" style="color: {{ cat.color }}">{{ cat.icon }}</span>
+                <div>
+                    <h4>{{ cat.name }}</h4>
+                    <span class="category-count">{{ cat.products.count() }} produtos</span>
+                </div>
+            </div>
+
+            {% if cat.user_id == current_user.id %}
+            <div class="category-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEdit({{ cat.id }})">✏️</button>
+
+                <form method="POST" action="{{ url_for('categories.delete_category', id=cat.id) }}" 
+                      style="display:inline;" onsubmit="return confirm('Excluir esta categoria?');">
+                    <button type="submit" class="btn btn-ghost btn-sm">🗑️</button>
+                </form>
+            </div>
+
+            <!-- Editar -->
+            <form method="POST" action="{{ url_for('categories.edit_category', id=cat.id) }}" 
+                  class="category-edit-form" id="edit-form-{{ cat.id }}" style="display:none;">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <input type="text" name="name" value="{{ cat.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="hidden" name="icon" id="icon-{{ cat.id }}" value="{{ cat.icon }}">
+                        <div class="emoji-display" onclick="openEmojiPicker({{ cat.id }})">{{ cat.icon }}</div>
+                    </div>
+                    <input type="hidden" name="color" value="{{ cat.color }}">
+                    <button type="submit" class="btn btn-primary btn-sm">💾</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal único de emojis (centralizado na tela) -->
+<div class="emoji-modal-overlay" id="emoji-modal">
+    <div class="emoji-modal">
+        <div class="emoji-modal-header">
+            <h4>Escolha um ícone</h4>
+            <button type="button" class="emoji-modal-close" onclick="closeEmojiPicker()">✕</button>
+        </div>
+        <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+</div>
+
+<script>
+const EMOJIS = [
+    '📦','🥗','🍎','🍌','🍞','🥩','🍗','🥚','🧀','🥛',
+    '🍝','🍚','🍪','🍫','🧃','🧊','🍺','🍷','🧴','🧻',
+    '🍕','🍔','🌭','🥪','🌮','🌯','🥙','🧆','🍳','🥘',
+    '🍲','🥣','🍿','🧈','🧂','🥫','🍱','🍘','🍙','🍛',
+    '🍜','🍠','🍢','🍣','🍤','🍥','🍡','🍦','🍧','🍨',
+    '🍩','🍰','🧁','🥧','🍮','🍭','🍬','🍼','☕','🍵',
+    '🥤','🍶','🍾','🥂','🥃','🍸','🍹','🧉','🥢','🍽️',
+    '🥬','🥦','🧄','🧅','🍄','🥕','🌽','🌶️','🥒','🥐',
+    '🥯','🥖','🥨','🥞','🧇','🥓','🍖','🦴','🥟','🦪',
+    '🥠','🥮','🌰','🥜','🍯','🧋','🥡','🧹','🍴','🥄'
+];
+
+let currentEmojiTarget = null; // 'new' ou id da categoria
+
+function preencherGrid() {
+    const grid = document.getElementById('emoji-grid');
+    if (grid.children.length > 0) return;
+
+    EMOJIS.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'emoji-option';
+        btn.textContent = emoji;
+        btn.onclick = function() {
+            if (!currentEmojiTarget) return;
+            document.getElementById('icon-' + currentEmojiTarget).value = emoji;
+            // Atualiza a caixinha visual também
+            const displays = document.querySelectorAll('.emoji-display');
+            displays.forEach(d => {
+                if (d.getAttribute('onclick') === "openEmojiPicker('" + currentEmojiTarget + "')" ||
+                    d.getAttribute('onclick') === "openEmojiPicker(" + currentEmojiTarget + ")") {
+                    d.textContent = emoji;
+                }
+            });
+            closeEmojiPicker();
+        };
+        grid.appendChild(btn);
+    });
+}
+
+function openEmojiPicker(id) {
+    currentEmojiTarget = String(id);
+    preencherGrid();
+    document.getElementById('emoji-modal').classList.add('open');
+}
+
+function closeEmojiPicker() {
+    document.getElementById('emoji-modal').classList.remove('open');
+    currentEmojiTarget = null;
+}
+
+// Fecha ao clicar no overlay (fora do modal)
+document.getElementById('emoji-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeEmojiPicker();
+});
+
+function toggleEdit(id) {
+    const form = document.getElementById('edit-form-' + id);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

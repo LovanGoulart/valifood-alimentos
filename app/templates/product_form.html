@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}{% if product %}Editar{% else %}Novo{% endif %} Produto - ValiFood{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="page-header">
+        <h2>{% if product %}✏️ Editar{% else %}➕ Novo{% endif %} Alimento</h2>
+    </div>
+
+    {% if barcode and existing %}
+    <div class="existing-product">
+        <div class="existing-header">
+            <span class="existing-icon">📦</span>
+            <div>
+                <h3>Produto já cadastrado</h3>
+                <p>{{ existing.name }} — {{ existing.quantity|int }} {{ existing.unit }}</p>
+            </div>
+        </div>
+        <div class="existing-actions">
+            <form method="POST" action="{{ url_for('products.add_stock', id=existing.id) }}" class="inline-form">
+                <input type="hidden" name="amount" value="1">
+                <button type="submit" class="btn btn-primary">➕ Adicionar estoque</button>
+            </form>
+            <a href="{{ url_for('products.edit', id=existing.id) }}" class="btn btn-secondary">✏️ Editar</a>
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </div>
+    {% else %}
+
+    {% if barcode %}
+    <div class="barcode-info">
+        <span class="barcode-label">Código detectado:</span>
+        <span class="barcode-value">{{ barcode }}</span>
+    </div>
+    {% endif %}
+
+    {% if reactivate %}
+    <div class="barcode-info" style="border-left:3px solid #10b981;">
+        <span class="barcode-label">♻️ Produto excluído anteriormente — nome, marca e categoria já preenchidos. Complete o restante.</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" class="product-form" id="product-form">
+        {% if reactivate %}
+        <input type="hidden" name="reactivate_id" value="{{ reactivate.id }}">
+        {% endif %}
+        <div class="form-group">
+            <label for="name">Nome do alimento *</label>
+            <input type="text" id="name" name="name" required
+                   value="{{ product.name if product else (reactivate.name if reactivate else '') }}"
+                   placeholder="Ex: Arroz Branco" autocomplete="off">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="barcode">Código de barras</label>
+                <div class="barcode-input-group">
+                    <input type="text" id="barcode" name="barcode" 
+                           value="{{ product.barcode if product else (barcode or '') }}"
+                           placeholder="7891234567890" autocomplete="off">
+                    <button type="button" class="btn btn-scan" onclick="openScannerModal()" title="Escanear código de barras">
+                        📷
+                    </button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="brand">Marca</label>
+                <input type="text" id="brand" name="brand"
+                       value="{{ product.brand if product else (reactivate.brand if reactivate else '') }}"
+                       placeholder="Ex: Tio João">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="category_id">Categoria</label>
+                <select id="category_id" name="category_id">
+                    <option value="">Selecione...</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if (product and product.category_id == cat.id) or (reactivate and reactivate.category_id == cat.id) %}selected{% endif %}>
+                        {{ cat.icon }} {{ cat.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="location_id">Local de armazenamento</label>
+                <select id="location_id" name="location_id">
+                    <option value="">Selecione...</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if product and product.storage_location_id == loc.id %}selected{% endif %}>
+                        {{ loc.icon }} {{ loc.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="quantity">Quantidade</label>
+                <input type="number" id="quantity" name="quantity" step="0.01" min="0"
+                       value="{{ product.quantity if product else '1' }}">
+            </div>
+            <div class="form-group">
+                <label for="unit">Unidade</label>
+                <select id="unit" name="unit">
+                    {% set units = ['unidade', 'pacote', 'caixa', 'kg', 'g', 'litro', 'ml', 'garrafa', 'lata', 'pote', 'outro'] %}
+                    {% for u in units %}
+                    <option value="{{ u }}" {% if product and product.unit == u %}selected{% elif not product and u == 'unidade' %}selected{% endif %}>{{ u }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="no_expiration" name="no_expiration" 
+                       {% if product and product.no_expiration %}checked{% endif %}>
+                <span> Produto sem validade</span>
+            </label>
+        </div>
+
+        <div class="form-group" id="expiration-group">
+            <label for="expiration_date">Data de validade *</label>
+            <input type="date" id="expiration_date" name="expiration_date" 
+                   value="{{ product.expiration_date.isoformat() if product and product.expiration_date else '' }}"
+                   {% if not product or not product.no_expiration %}required{% endif %}>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Observações</label>
+            <textarea id="notes" name="notes" rows="2" 
+                      placeholder="Opcional">{{ product.notes if product else '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-primary btn-block">
+                {% if product %}💾 Salvar alterações{% else %}💾 Cadastrar alimento{% endif %}
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('no_expiration').addEventListener('change', function() {
+    const group = document.getElementById('expiration-group');
+    const input = group.querySelector('input');
+    if (this.checked) {
+        group.style.opacity = '0.5';
+        input.removeAttribute('required');
+        input.disabled = true;
+        input.value = '';
+    } else {
+        group.style.opacity = '1';
+        input.setAttribute('required', 'required');
+        input.disabled = false;
+    }
+});
+
+const form = document.getElementById('product-form');
+form.addEventListener('submit', function(e) {
+    const expInput = document.getElementById('expiration_date');
+    const noExp = document.getElementById('no_expiration').checked;
+    if (!noExp && expInput.value) {
+        const date = new Date(expInput.value);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if (date < today) {
+            if (!confirm('⚠️ A data informada já passou. Deseja cadastrar mesmo assim?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

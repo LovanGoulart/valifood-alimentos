@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Produtos - ValiFood{% endblock %}
+
+{% block content %}
+<div class="products-page">
+    <div class="page-header">
+        <h2>📦 Meus Alimentos</h2>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" id="search-input" placeholder="🔎 Procurar alimento..." 
+               value="{{ search }}" autocomplete="off">
+    </div>
+
+    <div class="filter-chips">
+        <a href="{{ url_for('products.list_products') }}" class="chip {% if filter_status == 'todos' %}active{% endif %}">Todos</a>
+        <a href="{{ url_for('products.list_products', status='vencido') }}" class="chip {% if filter_status == 'vencido' %}active{% endif %}">Vencidos</a>
+        <a href="{{ url_for('products.list_products', status='vence_hoje') }}" class="chip {% if filter_status == 'vence_hoje' %}active{% endif %}">Hoje</a>
+        <a href="{{ url_for('products.list_products', status='atencao') }}" class="chip {% if filter_status == 'atencao' %}active{% endif %}">7 dias</a>
+        <a href="{{ url_for('products.list_products', status='proximo') }}" class="chip {% if filter_status == 'proximo' %}active{% endif %}">30 dias</a>
+        <a href="{{ url_for('products.list_products', status='sem_validade') }}" class="chip {% if filter_status == 'sem_validade' %}active{% endif %}">Sem validade</a>
+    </div>
+
+    <div class="product-list" id="product-list">
+        {% for p in products %}
+        <a href="{{ url_for('products.detail', id=p.id) }}" class="product-card product-{{ p.get_status() }}">
+            <div class="product-icon">{{ p.category.icon if p.category else '📦' }}</div>
+            <div class="product-info">
+                <h4 class="product-name">{{ p.name }}</h4>
+                <p class="product-brand">{{ p.brand or '' }}</p>
+                <p class="product-meta">
+                    {% if p.no_expiration or not p.expiration_date %}
+                        <span class="badge badge-neutral">📅 Sem validade</span>
+                    {% elif p.get_status() == 'vencido' %}
+                        <span class="badge badge-danger">❌ Vencido há {{ p.get_days_remaining()|abs }} dias</span>
+                    {% elif p.get_status() == 'vence_hoje' %}
+                        <span class="badge badge-warning">⚠️ Vence hoje</span>
+                    {% elif p.get_status() == 'urgente' %}
+                        <span class="badge badge-urgent">🔴 Vence em {{ p.get_days_remaining() }} dias</span>
+                    {% elif p.get_status() == 'atencao' %}
+                        <span class="badge badge-attention">🟡 Vence em {{ p.get_days_remaining() }} dias</span>
+                    {% elif p.get_status() == 'proximo' %}
+                        <span class="badge badge-info">🔵 Vence em {{ p.get_days_remaining() }} dias</span>
+                    {% else %}
+                        <span class="badge badge-success">✓ Vence em {{ p.get_days_remaining() }} dias</span>
+                    {% endif %}
+                </p>
+                <p class="product-location">📍 {{ p.location.name if p.location else 'Sem local' }}</p>
+            </div>
+            <div class="product-qty">
+                <span class="qty-value">{{ p.quantity|int }}</span>
+                <span class="qty-unit">{{ p.unit }}</span>
+            </div>
+        </a>
+        {% else %}
+        <div class="empty-state">
+            <span class="empty-icon">📭</span>
+            <p>Nenhum produto encontrado</p>
+            <a href="#" onclick="openScannerModal(); return false;" class="btn btn-primary">Adicionar primeiro alimento</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const searchInput = document.getElementById('search-input');
+    const productList = document.getElementById('product-list');
+    let debounceTimer;
+
+    if (!searchInput || !productList) return;
+
+    // Se já tem valor na URL (refresh com search), não faz nada extra
+    // A busca em tempo real só acontece quando o usuário digita
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const q = this.value.trim();
+
+        debounceTimer = setTimeout(() => {
+            if (q.length === 0) {
+                // Recarrega a página sem filtro para mostrar todos
+                window.location.href = "{{ url_for('products.list_products') }}";
+                return;
+            }
+
+            fetch('/api/products?q=' + encodeURIComponent(q))
+                .then(r => {
+                    if (!r.ok) throw new Error('Erro na busca');
+                    return r.json();
+                })
+                .then(products => {
+                    renderProducts(products);
+                })
+                .catch(err => {
+                    console.error('Erro ao buscar:', err);
+                });
+        }, 400); // aguarda 400ms após parar de digitar
+    });
+
+    function renderProducts(products) {
+        if (products.length === 0) {
+            productList.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">📭</span>
+                    <p>Nenhum produto encontrado</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        products.forEach(p => {
+            let badge = '';
+            if (p.no_expiration || !p.expiration_date) {
+                badge = '<span class="badge badge-neutral">📅 Sem validade</span>';
+            } else if (p.status === 'vencido') {
+                badge = '<span class="badge badge-danger">❌ Vencido há ' + Math.abs(p.days_remaining) + ' dias</span>';
+            } else if (p.status === 'vence_hoje') {
+                badge = '<span class="badge badge-warning">⚠️ Vence hoje</span>';
+            } else if (p.status === 'urgente') {
+                badge = '<span class="badge badge-urgent">🔴 Vence em ' + p.days_remaining + ' dias</span>';
+            } else if (p.status === 'atencao') {
+                badge = '<span class="badge badge-attention">🟡 Vence em ' + p.days_remaining + ' dias</span>';
+            } else if (p.status === 'proximo') {
+                badge = '<span class="badge badge-info">🔵 Vence em ' + p.days_remaining + ' dias</span>';
+            } else {
+                badge = '<span class="badge badge-success">✓ Vence em ' + p.days_remaining + ' dias</span>';
+            }
+
+            const locationName = p.storage_location || 'Sem local';
+            const categoryIcon = p.category_icon || '📦';
+
+            html += `
+                <a href="/produtos/${p.id}" class="product-card product-${p.status}">
+                    <div class="product-icon">${categoryIcon}</div>
+                    <div class="product-info">
+                        <h4 class="product-name">${escapeHtml(p.name)}</h4>
+                        <p class="product-brand">${p.brand ? escapeHtml(p.brand) : ''}</p>
+                        <p class="product-meta">${badge}</p>
+                        <p class="product-location">📍 ${escapeHtml(locationName)}</p>
+                    </div>
+                    <div class="product-qty">
+                        <span class="qty-value">${Math.floor(p.quantity)}</span>
+                        <span class="qty-unit">${p.unit}</span>
+                    </div>
+                </a>
+            `;
+        });
+
+        productList.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+})();
+</script>
+{% endblock %}
